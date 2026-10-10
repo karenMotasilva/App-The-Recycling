@@ -3,9 +3,9 @@
     "name": "The Recycling",
     "slug": "the-recycling",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/logo.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/images/splash-image.png",
       "resizeMode": "contain",
@@ -18,7 +18,8 @@
       }
     },
     "plugins": [
-      "expo-splash-screen"
+      "expo-splash-screen",
+      "expo-sharing"
     ]
   }
 }
