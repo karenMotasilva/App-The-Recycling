@@ -11,9 +11,13 @@ import {
   Alert,
 } from 'react-native';
 
+import { useAuth } from '../Context/AuthContext';
+
 type Aba = 'Recompensas' | 'Ranking' | 'Home' | 'Perfil' | 'ESG';
 
 export default function HomeScreen() {
+  const { user } = useAuth();
+
   const [abaSelecionada, setAbaSelecionada] = useState<Aba>('Home');
 
   return (
@@ -44,7 +48,7 @@ export default function HomeScreen() {
 
         {/* Saudação */}
         <Text style={styles.saudacao}>
-          Bem-vindo, Alejandro
+          Bem-vindo, {user?.name || 'usuário'}!
         </Text>
 
         {/* Saldo de pontos */}
@@ -105,7 +109,7 @@ export default function HomeScreen() {
           Próximas Recompensas
         </Text>
 
-     </ScrollView>
+      </ScrollView>
     </SafeAreaView>
   );
 }

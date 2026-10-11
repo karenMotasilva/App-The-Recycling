@@ -1,8 +1,16 @@
 import React from 'react';
 
-import {SafeAreaView,ScrollView,View,Text,StyleSheet,StatusBar,} from 'react-native';
+import {
+  SafeAreaView,
+  ScrollView,
+  View,
+  Text,
+  StyleSheet,
+  StatusBar,
+} from 'react-native';
 
 import { Theme } from '../Theme/Theme';
+import { useAuth } from '../Context/AuthContext';
 
 type Morador = {
   id: string;
@@ -51,16 +59,48 @@ const moradores: Morador[] = [
 ];
 
 export const RankingScreen: React.FC = () => {
-  const meuNome = 'Kyu';
+  const { user } = useAuth();
 
-  const meuIndice = moradores.findIndex(
-    (morador) => morador.nome === meuNome,
+  const meuNome = user?.name || 'Usuário';
+
+  // Verifica se a pessoa já existe na lista de moradores.
+  const moradorCadastrado = moradores.some(
+    (morador) =>
+      morador.nome.trim().toLowerCase() ===
+      meuNome.trim().toLowerCase(),
   );
 
-  const minhaPosicao = meuIndice >= 0 ? meuIndice + 1 : null;
+  // Se for uma nova conta, inclui a pessoa no ranking.
+  // Os pontos começam em zero porque ainda não há pontuação real.
+  const listaMoradores: Morador[] = moradorCadastrado
+    ? moradores
+    : [
+        ...moradores,
+        {
+          id: user?.email || 'usuario-atual',
+          nome: meuNome,
+          apartamento: 'Apartamento não informado',
+          pontos: 0,
+        },
+      ];
 
-  const meuPonto =
-    meuIndice >= 0 ? moradores[meuIndice].pontos : 0;
+  // Ordena os moradores do maior para o menor número de pontos.
+  const ranking = [...listaMoradores].sort(
+    (a, b) => b.pontos - a.pontos,
+  );
+
+  // Localiza a pessoa conectada.
+  const meuIndice = ranking.findIndex(
+    (morador) =>
+      morador.nome.trim().toLowerCase() ===
+      meuNome.trim().toLowerCase(),
+  );
+
+  const minhaPosicao =
+    meuIndice >= 0 ? meuIndice + 1 : null;
+
+  const meusPontos =
+    meuIndice >= 0 ? ranking[meuIndice].pontos : 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -120,7 +160,7 @@ export const RankingScreen: React.FC = () => {
 
           <View style={styles.pontosMinhaPosicao}>
             <Text style={styles.numeroPontos}>
-              {meuPonto.toLocaleString('pt-BR')}
+              {meusPontos.toLocaleString('pt-BR')}
             </Text>
 
             <Text style={styles.rotuloPontos}>
@@ -135,12 +175,15 @@ export const RankingScreen: React.FC = () => {
         </Text>
 
         <View style={styles.listaRanking}>
-          {moradores.map((morador, index) => {
+          {ranking.map((morador, index) => {
             const posicao = index + 1;
             const primeiro = posicao === 1;
             const segundo = posicao === 2;
             const terceiro = posicao === 3;
-            const souEu = morador.nome === meuNome;
+
+            const souEu =
+              morador.nome.trim().toLowerCase() ===
+              meuNome.trim().toLowerCase();
 
             return (
               <View

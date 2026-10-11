@@ -7,8 +7,8 @@ import * as SplashScreen from 'expo-splash-screen';
 import { LoadingScreen } from './Src/Screens/LoadingScreen';
 import { AuthStack } from './Src/Navigation/AuthStack';
 import { Theme } from './Src/Theme/Theme';
+import { AuthProvider } from './Src/Context/AuthContext';
 
-// Impede que o ecrã inicial desapareça antes do JavaScript carregar por completo
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function App() {
@@ -17,11 +17,9 @@ export default function App() {
   useEffect(() => {
     async function initApp() {
       try {
-        // Simula o tempo de carregamento (2.5s)
         await new Promise((resolve) => setTimeout(resolve, 2500));
       } finally {
         setIsLoading(false);
-        // Oculta a splash screen nativa do Expo
         await SplashScreen.hideAsync().catch(() => {});
       }
     }
@@ -31,17 +29,20 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor={Theme.colors.background}
-      />
-      {isLoading ? (
-        <LoadingScreen />
-      ) : (
-        <NavigationContainer>
-          <AuthStack />
-        </NavigationContainer>
-      )}
+      <AuthProvider>
+        <StatusBar
+          barStyle="dark-content"
+          backgroundColor={Theme.colors.background}
+        />
+
+        {isLoading ? (
+          <LoadingScreen />
+        ) : (
+          <NavigationContainer>
+            <AuthStack />
+          </NavigationContainer>
+        )}
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }
