@@ -1,9 +1,11 @@
-import React from 'react';
-import { Text,View,FlatList,Image, StyleSheet,} from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { Text,View,FlatList,Image, StyleSheet, Alert, TouchableOpacity,} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Theme } from '../Theme/Theme';
 import { globalStyles } from '../Theme/GlobalStyles';
+import { useFocusEffect } from '@react-navigation/native';
+import { api } from '../Services/api';
 
 type Recompensa = {
   id: string;
@@ -21,51 +23,50 @@ type Descarte = {
   pontos: number;
 };
 
-const recompensas: Recompensa[] = [
-  {
-    id: '1',
-    titulo: 'Desconto na conta de luz',
-    categoria: 'Economia de energia',
-    pontos: 200,
-    imagem:
-      'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?w=500',
-  },
-  {
-    id: '2',
-    titulo: 'Vale-compras sustentável',
-    categoria: 'Comércio parceiro',
-    pontos: 150,
-    imagem:
-      'https://images.unsplash.com/photo-1542838132-92c53300491e?w=500',
-  },
-  {
-    id: '3',
-    titulo: 'Kit de plantas',
-    categoria: 'Jardim sustentável',
-    pontos: 100,
-    imagem:
-      'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=500',
-  },
-];
-
-const historico: Descarte[] = [
-  {
-    id: '1',
-    data: '17/10/2026',
-    local: 'Condomínio X',
-    peso: '2,5 kg',
-    pontos: 25,
-  },
-  {
-    id: '2',
-    data: '19/10/2026',
-    local: 'Condomínio X',
-    peso: '2,5 kg',
-    pontos: 25,
-  },
-];
-
 export const RewardScreen: React.FC = () => {
+  const [recompensas, setRecompensas] = useState<Recompensa[]>([]);
+  const [historico, setHistorico] = useState<Descarte[]>([]);
+  const [saldo, setSaldo] = useState(0);
+
+  
+  const carregar = useCallback(() => {
+    api('/recompensas')
+      .then((d) => {
+        setRecompensas(Array.isArray(d.recompensas) ? d.recompensas : []);
+        setHistorico(Array.isArray(d.historico) ? d.historico : []);
+        setSaldo(Number(d.pontos ?? 0));
+      })
+      .catch((error) => {
+        console.error('Erro ao carregar recompensas:', error);
+      });
+  }, []);
+  useFocusEffect(carregar);
+
+  function resgatar(item: Recompensa) {
+    Alert.alert(
+      'Resgatar recompensa',
+      `Trocar ${item.pontos} pontos por "${item.titulo}"?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Resgatar',
+          onPress: async () => {
+            try {
+              await api(`/recompensas/${item.id}/resgatar`, { method: 'POST' });
+              carregar();
+              Alert.alert('Recompensa resgatada', `Você resgatou "${item.titulo}"!`);
+            } catch (error) {
+              Alert.alert(
+                'Não foi possível resgatar',
+                error instanceof Error ? error.message : 'Tente novamente.',
+              );
+            }
+          },
+        },
+      ],
+    );
+  }
+
   return (
     <SafeAreaView style={globalStyles.safeArea}>
       <FlatList
@@ -83,6 +84,10 @@ export const RewardScreen: React.FC = () => {
               Recompensas Disponíveis
             </Text>
 
+            <Text style={[globalStyles.mutedText, { marginBottom: Theme.spacing.sm }]}>
+              Seu saldo: {Number(saldo ?? 0).toLocaleString('pt-BR')} pontos
+            </Text>
+
             {recompensas.map((item) => (
               <View key={item.id} style={styles.cartaoRecompensa}>
                 <View style={styles.informacoes}>
@@ -97,6 +102,16 @@ export const RewardScreen: React.FC = () => {
                   <Text style={styles.pontos}>
                     {item.pontos} pontos
                   </Text>
+
+                  <TouchableOpacity
+                    style={[styles.botaoResgatar, saldo < item.pontos && styles.botaoResgatarOff]}
+                    disabled={saldo < item.pontos}
+                    onPress={() => resgatar(item)}
+                  >
+                    <Text style={styles.botaoResgatarTexto}>
+                      {saldo < item.pontos ? `Faltam ${item.pontos - saldo} pts` : 'Resgatar'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
 
                 <Image
@@ -193,6 +208,24 @@ const styles = StyleSheet.create({
     color: Theme.colors.textLight,
     fontSize: Theme.typography.sizes.md,
     marginTop: Theme.spacing.xs,
+  },
+
+  botaoResgatar: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: Theme.spacing.md,
+    paddingVertical: Theme.spacing.xs,
+    borderRadius: Theme.borderRadius.pill,
+    marginTop: Theme.spacing.sm,
+  },
+
+  botaoResgatarOff: {
+    opacity: 0.6,
+  },
+
+  botaoResgatarTexto: {
+    color: Theme.colors.primary,
+    fontWeight: Theme.typography.weights.bold,
   },
 
   imagem: {

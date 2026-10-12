@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 
 import {
   SafeAreaView,
@@ -11,90 +11,33 @@ import {
 
 import { Theme } from '../Theme/Theme';
 import { useAuth } from '../Context/AuthContext';
+import { useFocusEffect } from '@react-navigation/native';
+import { api } from '../Services/api';
 
 type Morador = {
   id: string;
   nome: string;
   apartamento: string;
   pontos: number;
+  souEu?: boolean;
 };
-
-const moradores: Morador[] = [
-  {
-    id: '1',
-    nome: 'Karen Mota',
-    apartamento: 'Apto 302',
-    pontos: 1850,
-  },
-  {
-    id: '2',
-    nome: 'Nilson Santos',
-    apartamento: 'Apto 104',
-    pontos: 1620,
-  },
-  {
-    id: '3',
-    nome: 'Sara Lima',
-    apartamento: 'Apto 205',
-    pontos: 1480,
-  },
-  {
-    id: '4',
-    nome: 'Alejandro Silva',
-    apartamento: 'Apto 401',
-    pontos: 1250,
-  },
-  {
-    id: '5',
-    nome: 'Ismael Moura',
-    apartamento: 'Apto 103',
-    pontos: 1100,
-  },
-  {
-    id: '6',
-    nome: 'Pedro Oliveira',
-    apartamento: 'Apto 204',
-    pontos: 950,
-  },
-];
 
 export const RankingScreen: React.FC = () => {
   const { user } = useAuth();
 
+  const [ranking, setRanking] = useState<Morador[]>([]);
+
+  // Busca o ranking sempre que a tela ganha foco (já inclui quem acabou de descartar).
+  useFocusEffect(
+    useCallback(() => {
+      api('/ranking').then(setRanking).catch(() => {});
+    }, []),
+  );
+
   const meuNome = user?.name || 'Usuário';
 
-  // Verifica se a pessoa já existe na lista de moradores.
-  const moradorCadastrado = moradores.some(
-    (morador) =>
-      morador.nome.trim().toLowerCase() ===
-      meuNome.trim().toLowerCase(),
-  );
-
-  // Se for uma nova conta, inclui a pessoa no ranking.
-  // Os pontos começam em zero porque ainda não há pontuação real.
-  const listaMoradores: Morador[] = moradorCadastrado
-    ? moradores
-    : [
-        ...moradores,
-        {
-          id: user?.email || 'usuario-atual',
-          nome: meuNome,
-          apartamento: 'Apartamento não informado',
-          pontos: 0,
-        },
-      ];
-
-  // Ordena os moradores do maior para o menor número de pontos.
-  const ranking = [...listaMoradores].sort(
-    (a, b) => b.pontos - a.pontos,
-  );
-
-  // Localiza a pessoa conectada.
-  const meuIndice = ranking.findIndex(
-    (morador) =>
-      morador.nome.trim().toLowerCase() ===
-      meuNome.trim().toLowerCase(),
-  );
+  // Localiza a pessoa conectada (a API marca souEu).
+  const meuIndice = ranking.findIndex((morador) => morador.souEu);
 
   const minhaPosicao =
     meuIndice >= 0 ? meuIndice + 1 : null;
@@ -181,9 +124,7 @@ export const RankingScreen: React.FC = () => {
             const segundo = posicao === 2;
             const terceiro = posicao === 3;
 
-            const souEu =
-              morador.nome.trim().toLowerCase() ===
-              meuNome.trim().toLowerCase();
+            const souEu = morador.souEu;
 
             return (
               <View

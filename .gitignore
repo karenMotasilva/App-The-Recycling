@@ -1,5 +1,8 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
+backend/node_modules/
+backend/uploads/
+
 # dependencies
 node_modules/
 

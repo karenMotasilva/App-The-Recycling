@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -6,8 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   useWindowDimensions,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import { api, API_URL } from '../Services/api';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Theme } from '../Theme/Theme';
 import { globalStyles } from '../Theme/GlobalStyles';
@@ -18,6 +21,39 @@ import * as FileSystem from 'expo-file-system/legacy';
 export default function ESGScreen() {
   const { width } = useWindowDimensions();
   const [activeTab, setActiveTab] = useState<'Semana' | 'Mês' | 'Ano'>('Mês');
+
+  // Dados vindos da API (refaz a busca ao trocar a aba ou ao voltar para a tela)
+  const [dados, setDados] = useState<any>({
+    condominio: '', inicio: '', fim: '',
+    totalKg: 0, pontos: 0, carbono: 0, variacao: {}, materiais: [],
+    apartamento: '', foto: null,
+  });
+  const periodo = activeTab === 'Semana' ? 'semana' : activeTab === 'Ano' ? 'ano' : 'mes';
+  const anterior =
+    activeTab === 'Semana' ? 'semana anterior' : activeTab === 'Ano' ? 'ano anterior' : 'mês anterior';
+
+  useFocusEffect(
+    useCallback(() => {
+      api(`/esg?periodo=${periodo}`).then(setDados).catch(() => {});
+    }, [periodo]),
+  );
+
+  const nf = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+  const seta = (v: number | null | undefined) =>
+    v == null ? '—' : `${v >= 0 ? '↑' : '↓'} ${Math.abs(v)}%`;
+
+  const info: any = {
+    plastico: ['Plástico', Theme.colors.chart.plastic],
+    papel: ['Papel', Theme.colors.chart.paper],
+    vidro: ['Vidro', Theme.colors.chart.glass],
+    metal: ['Metal', Theme.colors.chart.metal],
+  };
+  const listaMateriais = dados.materiais.map((m: any) => ({
+    label: info[m.material][0],
+    weight: `${nf(m.kg)} kg`,
+    pct: `${m.pct}%`,
+    color: info[m.material][1],
+  }));
 
   // Largura calculada das abas com base nas dimensões da janela
   const tabWidth = (width - Theme.spacing.md * 2 - 8) / 3;
@@ -42,12 +78,12 @@ const handleGeneratePdf = async () => {
         </head>
         <body>
           <h1>Relatório Ambiental (ESG) - Recycling</h1>
-          <p><strong>Empresa:</strong> Jardim das Flores</p>
-          <p><strong>Período:</strong> 01 a 30 de setembro de 2026</p>
+          <p><strong>Empresa:</strong> ${dados.condominio}</p>
+          <p><strong>Período:</strong> ${dados.inicio} a ${dados.fim}</p>
           
           <div class="card">
             <h3>Total de Resíduos Triados</h3>
-            <p class="highlight">480 kg</p>
+            <p class="highlight">${nf(dados.totalKg)} kg</p>
           </div>
 
           <table>
@@ -59,10 +95,9 @@ const handleGeneratePdf = async () => {
               </tr>
             </thead>
             <tbody>
-              <tr><td>Plástico</td><td>192 kg</td><td>40%</td></tr>
-              <tr><td>Papel</td><td>144 kg</td><td>30%</td></tr>
-              <tr><td>Vidro</td><td>96 kg</td><td>20%</td></tr>
-              <tr><td>Metal</td><td>48 kg</td><td>10%</td></tr>
+              ${listaMateriais
+                .map((m: any) => `<tr><td>${m.label}</td><td>${m.weight}</td><td>${m.pct}</td></tr>`)
+                .join('')}
             </tbody>
           </table>
         </body>
@@ -76,7 +111,7 @@ const handleGeneratePdf = async () => {
       // Define o nome corporativo com base na data atual
       const now = new Date();
       const formattedDate = now.toISOString().split('T')[0];
-      const customFileName = `Relatorio_ESG_Jardim_das_Flores_${formattedDate}.pdf`;
+      const customFileName = `Relatorio_ESG_Jardim_das_Flores_${periodo}_${formattedDate}.pdf`;
       
       // Move o arquivo para o diretório de cache 
       const newUri = `${FileSystem.cacheDirectory}${customFileName}`;
@@ -111,13 +146,30 @@ const handleGeneratePdf = async () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Foto e apartamento do usuário */}
+        <View style={[globalStyles.rowCenter, { marginBottom: Theme.spacing.sm }]}>
+          {dados.foto ? (
+            <Image
+              source={{ uri: `${API_URL}/uploads/${dados.foto}` }}
+              style={styles.fotoPerfil}
+            />
+          ) : (
+            <Ionicons name="person-circle-outline" size={40} color={Theme.colors.primary} />
+          )}
+          <Text style={[globalStyles.mutedText, { marginLeft: Theme.spacing.xs }]}>
+            {dados.apartamento || 'Apartamento não informado'}
+          </Text>
+        </View>
+
         {/* Info da Empresa e Periodo */}
         <View style={globalStyles.rowBetween}>
           <View>
             <Text style={[globalStyles.title, { fontSize: Theme.typography.sizes.lg }]}>
-              Jardim das Flores
+              {dados.condominio}
             </Text>
-            <Text style={globalStyles.mutedText}>01 a 30 de setembro de 2026</Text>
+            <Text style={globalStyles.mutedText}>
+              {dados.inicio} a {dados.fim}
+            </Text>
           </View>
           <View style={globalStyles.badge}>
             <Text style={globalStyles.badgeText}>Painel ESG</Text>
@@ -159,11 +211,10 @@ const handleGeneratePdf = async () => {
           </View>
           <View style={globalStyles.rowBetween}>
             <Text style={[globalStyles.title, { fontSize: Theme.typography.sizes.xxl }]}>
-              480 <Text style={globalStyles.subtitle}>kg</Text>
+              {nf(dados.totalKg)} <Text style={globalStyles.subtitle}>kg</Text>
             </Text>
             <View style={globalStyles.rowCenter}>
-              <Ionicons name="arrow-up" size={14} color={Theme.colors.primary} />
-              <Text style={styles.growthText}>20%</Text>
+              <Text style={styles.growthText}>{seta(dados.variacao.kg)}</Text>
             </View>
           </View>
         </View>
@@ -172,14 +223,22 @@ const handleGeneratePdf = async () => {
         <View style={styles.gridRow}>
           <View style={[globalStyles.card, styles.smallCard]}>
             <Text style={globalStyles.subtitle}>Pontos Distribuídos</Text>
-            <Text style={[globalStyles.title, styles.cardValue]}>4.800</Text>
-            <Text style={styles.growthText}>↑ 20% vs. mês anterior</Text>
+            <Text style={[globalStyles.title, styles.cardValue]}>
+              {dados.pontos.toLocaleString('pt-BR')}
+            </Text>
+            <Text style={styles.growthText}>
+              {seta(dados.variacao.pontos)} vs. {anterior}
+            </Text>
           </View>
 
           <View style={[globalStyles.card, styles.smallCard]}>
             <Text style={globalStyles.subtitle}>Economia de Carbono (kgCO₂)</Text>
-            <Text style={[globalStyles.title, styles.cardValue]}>720</Text>
-            <Text style={styles.growthText}>↑ 20% vs. mês anterior</Text>
+            <Text style={[globalStyles.title, styles.cardValue]}>
+              {dados.carbono.toLocaleString('pt-BR')}
+            </Text>
+            <Text style={styles.growthText}>
+              {seta(dados.variacao.kg)} vs. {anterior}
+            </Text>
           </View>
         </View>
 
@@ -195,7 +254,7 @@ const handleGeneratePdf = async () => {
             <View style={styles.chartMock}>
               <View style={styles.chartInner}>
                 <Text style={[globalStyles.title, { fontSize: Theme.typography.sizes.base }]}>
-                  480 kg
+                  {nf(dados.totalKg)} kg
                 </Text>
                 <Text style={globalStyles.mutedText}>reciclados</Text>
               </View>
@@ -203,12 +262,7 @@ const handleGeneratePdf = async () => {
 
             {/* Lista dos residuos reciclados */}
             <View style={styles.breakdownList}>
-              {[
-                { label: 'Plástico', weight: '192 kg', pct: '40%', color: Theme.colors.chart.plastic },
-                { label: 'Papel', weight: '144 kg', pct: '30%', color: Theme.colors.chart.paper },
-                { label: 'Vidro', weight: '96 kg', pct: '20%', color: Theme.colors.chart.glass },
-                { label: 'Metal', weight: '48 kg', pct: '10%', color: Theme.colors.chart.metal },
-              ].map((item, index) => (
+              {listaMateriais.map((item: any, index: number) => (
                 <View key={index} style={[globalStyles.rowBetween, { marginBottom: Theme.spacing.xs }]}>
                   <View style={globalStyles.rowCenter}>
                     <View style={[styles.dot, { backgroundColor: item.color }]} />
@@ -226,7 +280,7 @@ const handleGeneratePdf = async () => {
           </View>
 
           <Text style={[globalStyles.mutedText, styles.footerNote]}>
-            480 kg de materiais destinados à reciclagem.
+            {nf(dados.totalKg)} kg de materiais destinados à reciclagem.
           </Text>
         </View>
 
@@ -240,7 +294,7 @@ const handleGeneratePdf = async () => {
         </TouchableOpacity>
 
         <Text style={[globalStyles.mutedText, styles.updateInfo]}>
-          Atualizado em 30/09 às 18:00  - Ainda vou mudar
+          Atualizado em {new Date().toLocaleDateString('pt-BR')}
         </Text>
       </ScrollView>
     </SafeAreaView>
@@ -319,6 +373,11 @@ const styles = StyleSheet.create({
     borderBottomColor: Theme.colors.chart.glass,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  fotoPerfil: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   chartInner: {
     alignItems: 'center',

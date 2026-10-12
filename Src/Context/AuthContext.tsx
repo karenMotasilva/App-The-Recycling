@@ -6,12 +6,7 @@ import React, {
 } from 'react';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-type User = {
-  name: string;
-  email: string;
-  password: string;
-};
+import { api, setToken } from '../Services/api';
 
 type PublicUser = {
   name: string;
@@ -24,7 +19,9 @@ type AuthContextData = {
   register: (
     name: string,
     email: string,
-    password: string
+    password: string,
+    cpf: string,
+    apartamento: string
   ) => Promise<void>;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -34,7 +31,6 @@ const AuthContext = createContext<AuthContextData>(
   {} as AuthContextData
 );
 
-const USERS_KEY = '@therecycling:users';
 const SESSION_KEY = '@therecycling:session';
 
 export function AuthProvider({
@@ -61,52 +57,21 @@ export function AuthProvider({
     loadSession();
   }, []);
 
-  // Cadastrar uma nova conta.
+  // Cadastrar uma nova conta (a API valida e-mail duplicado).
   async function register(
     name: string,
     email: string,
-    password: string
+    password: string,
+    cpf: string,
+    apartamento: string
   ) {
-    const normalizedEmail = email.trim().toLowerCase();
+    const data = await api('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ name, email, password, cpf, apartamento }),
+    });
 
-    const savedUsers = await AsyncStorage.getItem(USERS_KEY);
-
-    const users: User[] = savedUsers
-      ? JSON.parse(savedUsers)
-      : [];
-
-    const emailExists = users.some(
-      (item) => item.email === normalizedEmail
-    );
-
-    if (emailExists) {
-      throw new Error(
-        'Já existe uma conta cadastrada com esse e-mail.'
-      );
-    }
-
-    const newUser: User = {
-      name: name.trim(),
-      email: normalizedEmail,
-      password,
-    };
-
-    const publicUser: PublicUser = {
-      name: newUser.name,
-      email: newUser.email,
-    };
-
-    await AsyncStorage.setItem(
-      USERS_KEY,
-      JSON.stringify([...users, newUser])
-    );
-
-    await AsyncStorage.setItem(
-      SESSION_KEY,
-      JSON.stringify(publicUser)
-    );
-
-    setUser(publicUser);
+    setToken(data.token);
+    setUser(data.user);
   }
 
   // Entrar em uma conta existente.
@@ -114,42 +79,25 @@ export function AuthProvider({
     email: string,
     password: string
   ): Promise<boolean> {
-    const savedUsers = await AsyncStorage.getItem(USERS_KEY);
+    try {
+      const data = await api('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
 
-    const users: User[] = savedUsers
-      ? JSON.parse(savedUsers)
-      : [];
-
-    const normalizedEmail = email.trim().toLowerCase();
-
-    const foundUser = users.find(
-      (item) =>
-        item.email === normalizedEmail &&
-        item.password === password
-    );
-
-    if (!foundUser) {
-      return false;
+      setToken(data.token);
+      setUser(data.user);
+      return true;
+    } catch (error: any) {
+      if (error.status === 401) return false;
+      throw error;
     }
-
-    const publicUser: PublicUser = {
-      name: foundUser.name,
-      email: foundUser.email,
-    };
-
-    await AsyncStorage.setItem(
-      SESSION_KEY,
-      JSON.stringify(publicUser)
-    );
-
-    setUser(publicUser);
-
-    return true;
   }
 
   // Sair da conta.
   async function logout() {
     await AsyncStorage.removeItem(SESSION_KEY);
+    setToken(null);
     setUser(null);
   }
 

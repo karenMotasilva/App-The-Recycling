@@ -1,4 +1,3 @@
-
 import {
   View,
   Text,
@@ -6,12 +5,24 @@ import {
   Pressable,
   StatusBar,
   StyleSheet,
+  Alert,
+  Image,
+  Modal,
+  Switch,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { globalStyles } from "../Theme/GlobalStyles";
-import React from "react";
+import React, { useCallback, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { api, API_URL } from "../Services/api";
+import * as ImagePicker from "expo-image-picker";
+import { File } from "expo-file-system";
+import { useAuth } from "../Context/AuthContext";
 
 
 const COLORS = {
@@ -24,13 +35,6 @@ const COLORS = {
 };
 
 
-const user = {
-  name: "Sara Lima",
-  condominium: "Condomínio Jardim das Flores",
-  cpf: "221.245.221-36",
-  email: "sara.lima@email.com",
-  points: "1.560 pts",
-};
 
 
 function InfoRow({
@@ -96,6 +100,83 @@ function AccountOption({
 
 // Tela principal de Perfil
 export const ProfileScreen: React.FC = () => {
+  const { logout } = useAuth();
+
+  const [user, setUser] = useState({
+    name: "",
+    condominium: "",
+    cpf: "",
+    email: "",
+    points: "",
+    apartamento: "",
+    foto: null as string | null,
+    notifPontos: true,
+    notifRecompensas: true,
+  });
+  const [modalDados, setModalDados] = useState(false);
+  const [modalNotif, setModalNotif] = useState(false);
+  const [cpfEdit, setCpfEdit] = useState("");
+  const [aptoEdit, setAptoEdit] = useState("");
+
+  useFocusEffect(
+    useCallback(() => {
+      api("/perfil").then(setUser).catch(() => {});
+    }, []),
+  );
+
+  const recarregar = () => api("/perfil").then(setUser).catch(() => {});
+
+  async function trocarFoto() {
+    const r = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+    if (r.canceled) return;
+    try {
+      const form = new FormData();
+      form.append("foto", new File(r.assets[0].uri), "perfil.jpg");
+      await api("/perfil/foto", { method: "POST", body: form });
+      recarregar();
+    } catch (error) {
+      Alert.alert(
+        "Não foi possível atualizar a foto",
+        error instanceof Error ? error.message : "Tente novamente.",
+      );
+    }
+  }
+
+  function abrirEditar() {
+    setCpfEdit(user.cpf === "Não informado" ? "" : user.cpf);
+    setAptoEdit(user.apartamento === "Não informado" ? "" : user.apartamento);
+    setModalDados(true);
+  }
+
+  async function salvarDados() {
+    try {
+      await api("/perfil", {
+        method: "PUT",
+        body: JSON.stringify({ cpf: cpfEdit, apartamento: aptoEdit }),
+      });
+      setModalDados(false);
+      recarregar();
+    } catch (error) {
+      Alert.alert(
+        "Não foi possível salvar",
+        error instanceof Error ? error.message : "Tente novamente.",
+      );
+    }
+  }
+
+  async function alternarNotif(campo: "notifPontos" | "notifRecompensas", valor: boolean) {
+    setUser({ ...user, [campo]: valor });
+    try {
+      await api("/perfil", { method: "PUT", body: JSON.stringify({ [campo]: valor }) });
+    } catch {
+      recarregar();
+    }
+  }
+
   return (
     <SafeAreaView
       style={[globalStyles.container, styles.safeArea]}
@@ -119,9 +200,16 @@ export const ProfileScreen: React.FC = () => {
       
         <View style={styles.profileCard}>
          
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={88} color="#42616A" />
-          </View>
+          <Pressable style={styles.avatar} onPress={trocarFoto}>
+            {user.foto ? (
+              <Image
+                source={{ uri: `${API_URL}/uploads/${user.foto}` }}
+                style={styles.avatarFoto}
+              />
+            ) : (
+              <Ionicons name="person" size={88} color="#42616A" />
+            )}
+          </Pressable>
 
           <Text style={styles.userName}>{user.name}</Text>
 
@@ -134,6 +222,8 @@ export const ProfileScreen: React.FC = () => {
             <InfoRow icon="id-card-outline" label="CPF" value={user.cpf} />
 
             <InfoRow icon="mail-outline" label="E-mail" value={user.email} />
+
+            <InfoRow icon="home-outline" label="Apartamento" value={user.apartamento} />
           </View>
         </View>
 
@@ -144,7 +234,7 @@ export const ProfileScreen: React.FC = () => {
           <AccountOption
             icon="person-outline"
             title="Editar Dados"
-            onPress={() => console.log("Editar dados")}
+            onPress={abrirEditar}
           />
 
           <AccountOption
@@ -157,19 +247,86 @@ export const ProfileScreen: React.FC = () => {
           <AccountOption
             icon="notifications-outline"
             title="Configurações de Notificação"
-            onPress={() => console.log("Configurações de notificação")}
+            onPress={() => setModalNotif(true)}
           />
 
           <AccountOption
             icon="log-out-outline"
             title="Sair"
-            onPress={() => console.log("Sair da conta")}
+            onPress={logout}
           />
         </View>
 
        
         <Text style={styles.fonteSlogan}>Recicle. Ganhe. Transforme.</Text>
       </ScrollView>
+      <Modal visible={modalDados} animationType="slide" transparent onRequestClose={() => setModalDados(false)}>
+        <KeyboardAvoidingView
+          style={styles.modalFundo}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <View style={styles.modalCaixa}>
+            <Text style={styles.modalTitulo}>Editar Dados</Text>
+
+            <Text style={styles.modalRotulo}>CPF</Text>
+            <TextInput
+              style={styles.campo}
+              placeholder="000.000.000-00"
+              placeholderTextColor="#82969A"
+              value={cpfEdit}
+              onChangeText={setCpfEdit}
+              keyboardType="numeric"
+              maxLength={14}
+            />
+
+            <Text style={styles.modalRotulo}>Apartamento</Text>
+            <TextInput
+              style={styles.campo}
+              placeholder="Ex.: Bloco A, apto 302"
+              placeholderTextColor="#82969A"
+              value={aptoEdit}
+              onChangeText={setAptoEdit}
+            />
+
+            <Pressable style={styles.botaoSalvar} onPress={salvarDados}>
+              <Text style={styles.botaoSalvarTexto}>Salvar</Text>
+            </Pressable>
+            <Pressable onPress={() => setModalDados(false)}>
+              <Text style={styles.cancelar}>Cancelar</Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal visible={modalNotif} animationType="slide" transparent onRequestClose={() => setModalNotif(false)}>
+        <View style={styles.modalFundo}>
+          <View style={styles.modalCaixa}>
+            <Text style={styles.modalTitulo}>Notificações</Text>
+
+            <View style={styles.linhaSwitch}>
+              <Text style={styles.optionTitle}>Pontos e descartes</Text>
+              <Switch
+                value={user.notifPontos}
+                onValueChange={(v) => alternarNotif("notifPontos", v)}
+                trackColor={{ true: COLORS.primary }}
+              />
+            </View>
+
+            <View style={styles.linhaSwitch}>
+              <Text style={styles.optionTitle}>Novas recompensas</Text>
+              <Switch
+                value={user.notifRecompensas}
+                onValueChange={(v) => alternarNotif("notifRecompensas", v)}
+                trackColor={{ true: COLORS.primary }}
+              />
+            </View>
+
+            <Pressable onPress={() => setModalNotif(false)}>
+              <Text style={styles.cancelar}>Fechar</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -335,6 +492,78 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: COLORS.primary,
+  },
+
+  avatarFoto: {
+    width: 124,
+    height: 124,
+  },
+
+  modalFundo: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+
+  modalCaixa: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 22,
+  },
+
+  modalTitulo: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: COLORS.text,
+    marginBottom: 6,
+  },
+
+  modalRotulo: {
+    fontSize: 15,
+    color: COLORS.text,
+    marginTop: 14,
+    marginBottom: 8,
+  },
+
+  campo: {
+    height: 45,
+    borderWidth: 1,
+    borderColor: "#CFDFE2",
+    borderRadius: 9,
+    paddingHorizontal: 13,
+    fontSize: 15,
+    color: COLORS.text,
+  },
+
+  botaoSalvar: {
+    height: 52,
+    backgroundColor: COLORS.primary,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 20,
+  },
+
+  botaoSalvarTexto: {
+    color: COLORS.white,
+    fontWeight: "800",
+    fontSize: 16,
+  },
+
+  linhaSwitch: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+  },
+
+  cancelar: {
+    textAlign: "center",
+    color: COLORS.secondary,
+    fontWeight: "600",
+    marginTop: 14,
+    marginBottom: 6,
   },
 
   fonteSlogan: {

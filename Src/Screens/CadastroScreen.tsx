@@ -20,10 +20,12 @@ export default function CadastroScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [cpf, setCpf] = useState('');
+  const [apartamento, setApartamento] = useState('');
   const [sending, setSending] = useState(false);
 
   async function handleRegister() {
-    if (!name.trim() || !email.trim() || !password || !confirmPassword) {
+    if (!name.trim() || !email.trim() || !cpf.trim() || !apartamento.trim() || !password || !confirmPassword) {
       Alert.alert(
         'Campos obrigatórios',
         'Preencha todos os campos para continuar.',
@@ -35,6 +37,14 @@ export default function CadastroScreen() {
       Alert.alert(
         'E-mail inválido',
         'Informe um endereço de e-mail válido.',
+      );
+      return;
+    }
+
+    if (cpf.replace(/\D/g, '').length !== 11) {
+      Alert.alert(
+        'CPF inválido',
+        'Informe os 11 dígitos do CPF.',
       );
       return;
     }
@@ -58,7 +68,7 @@ export default function CadastroScreen() {
     setSending(true);
 
     try {
-      await register(name, email, password);
+      await register(name, email, password, cpf, apartamento);
 
       Alert.alert(
         'Conta criada',
@@ -121,6 +131,26 @@ export default function CadastroScreen() {
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
+        />
+
+        <Text style={styles.label}>CPF</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="000.000.000-00"
+          placeholderTextColor="#82969A"
+          value={cpf}
+          onChangeText={setCpf}
+          keyboardType="numeric"
+          maxLength={14}
+        />
+
+        <Text style={styles.label}>Apartamento</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Ex.: Bloco A, apto 302"
+          placeholderTextColor="#82969A"
+          value={apartamento}
+          onChangeText={setApartamento}
         />
 
         <Text style={styles.label}>Senha</Text>
