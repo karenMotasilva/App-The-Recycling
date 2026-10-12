@@ -6,8 +6,9 @@ import {
   Pressable,
   StatusBar,
   StyleSheet,
+  Alert,
 } from "react-native";
-
+import { useAuth } from '../Context/AuthContext';
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { globalStyles } from "../Theme/GlobalStyles";
@@ -24,13 +25,7 @@ const COLORS = {
 };
 
 
-const user = {
-  name: "Sara Lima",
-  condominium: "Condomínio Jardim das Flores",
-  cpf: "221.245.221-36",
-  email: "sara.lima@email.com",
-  points: "1.560 pts",
-};
+
 
 
 function InfoRow({
@@ -96,6 +91,29 @@ function AccountOption({
 
 // Tela principal de Perfil
 export const ProfileScreen: React.FC = () => {
+  const { user } = useAuth();
+
+  const { logout } = useAuth();
+
+function fazerLogout() {
+  Alert.alert(
+    'Sair da conta',
+    'Tem certeza de que deseja sair?',
+    [
+      {
+        text: 'Cancelar',
+        style: 'cancel',
+      },
+      {
+        text: 'Sair',
+        style: 'destructive',
+        onPress: async () => {
+          await logout();
+        },
+      },
+    ],
+  );
+}
   return (
     <SafeAreaView
       style={[globalStyles.container, styles.safeArea]}
@@ -103,7 +121,6 @@ export const ProfileScreen: React.FC = () => {
     >
       {/* <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} /> */}
 
-      
       <View style={styles.header}>
         <Pressable style={styles.backButton} onPress={() => {}}>
           <Ionicons name="arrow-back" size={28} color={COLORS.text} />
@@ -116,58 +133,68 @@ export const ProfileScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-      
         <View style={styles.profileCard}>
-         
           <View style={styles.avatar}>
             <Ionicons name="person" size={88} color="#42616A" />
           </View>
 
-          <Text style={styles.userName}>{user.name}</Text>
-
-          <View style={styles.conteinerBadge}>
+          <Text style={styles.userName}> {user?.name ?? "Usuário"}</Text>
+          {/* <View style={styles.conteinerBadge}>
             <Text style={styles.conteinerText}>{user.condominium}</Text>
-          </View>
+          </View> */}
 
-         
           <View style={styles.information}>
-            <InfoRow icon="id-card-outline" label="CPF" value={user.cpf} />
+            {/* <InfoRow icon="id-card-outline" label="CPF" value={user.cpf} /> */}
 
-            <InfoRow icon="mail-outline" label="E-mail" value={user.email} />
+            <InfoRow
+              icon="mail-outline"
+              label="E-mail"
+              value={user?.email ?? "E-mail não informado"}
+            />
           </View>
         </View>
 
-       
         <Text style={styles.selecTitle}>Minha conta</Text>
 
         <View style={styles.optionsContainer}>
           <AccountOption
             icon="person-outline"
             title="Editar Dados"
-            onPress={() => console.log("Editar dados")}
+            onPress={() =>
+              Alert.alert(
+                "Em desenvolvimento. Em breve estará disponível!",
+              )
+            }
           />
 
           <AccountOption
             icon="ribbon-outline"
             title="Meus Pontos"
-            detail={user.points}
-            onPress={() => console.log("Meus pontos")}
+            // detail={user.points}
+            onPress={() =>
+              Alert.alert(
+                " Em desenvolvimento. Em breve estará disponível!",
+              )
+            }
           />
 
           <AccountOption
             icon="notifications-outline"
             title="Configurações de Notificação"
-            onPress={() => console.log("Configurações de notificação")}
+            onPress={() =>
+              Alert.alert(
+                "Em desenvolvimento. Em breve estará disponível!",
+              )
+            }
           />
 
           <AccountOption
             icon="log-out-outline"
             title="Sair"
-            onPress={() => console.log("Sair da conta")}
+            onPress={fazerLogout}
           />
         </View>
 
-       
         <Text style={styles.fonteSlogan}>Recicle. Ganhe. Transforme.</Text>
       </ScrollView>
     </SafeAreaView>
