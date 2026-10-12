@@ -195,7 +195,7 @@ function fazerLogout() {
           />
         </View>
 
-        <Text style={styles.fonteSlogan}>Recicle. Ganhe. Transforme.</Text>
+        <Text style={styles.fonteSlogan}>Recicle e Ganhe Beneficios</Text>
       </ScrollView>
     </SafeAreaView>
   );
